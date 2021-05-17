@@ -10,6 +10,8 @@
 #define ROWS 4
 #define COLS 4
 
+u8 reset_counter = 0;
+
 const byte keys[ROWS][COLS] = {
   {0x1, 0x2, 0x3, 0xC},
   {0x4, 0x5, 0x6, 0xD},
@@ -44,6 +46,23 @@ u16 nnn = 0;
 u8 dt = 0;
 u8 st = 0;
 
+void reset_state()
+{
+  for (u16 i = 0; i < 64 * 32; i++) buf[i] = 0;
+  for (u8 i = 0; i < 16; i++) registers[i] = 0;
+  for (u8 i = 0; i < 16; i++) key_inputs[i] = 0;
+  stack_p = 0;
+  for (u8 i = 0; i < 16; i++) stack[i] = 0;
+  index = 0;
+  pc = 0x200;
+  vx = 0;
+  vy = 0;
+  kk = 0;
+  nnn = 0;
+  dt = 0;
+  st = 0;
+}
+
 u8 reverse_byte(u8 b) {
    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
@@ -75,13 +94,7 @@ void display_sprite(u8 x, u8 y, u8 n)
 
 void fill_screen()
 {
-  for (u8 i = 0; i < 32; i++)
-  {
-    for (u8 j = 0; j < 64; j++)
-    {
-      tv.set_pixel(j + 24, i + 24, buf[i * 64 + j]);
-    }
-  }
+  tv.clear_screen();
 }
 
 void execute()
@@ -305,6 +318,15 @@ void cycle()
 
   key = keypad.getKey();
 
+  if (key == 0xF) reset_counter += 1;
+  if (reset_counter == 3)
+  {
+    reset_counter = 0;
+    reset_state();
+    tv.clear_screen();
+    interface();
+  }
+  
   if (key != NO_KEY) {
     if (key == 0xFF) {
       key_inputs[0] = 1;
@@ -332,24 +354,56 @@ void cycle()
     if (st == 0)
     {
       tv.delay(100);
-//      tv.tone(500, 100);
+      tv.tone(500, 100);
+    }
+  }
+}
+
+void load_game(u8 game)
+{
+  for (u16 i = 0; i < games_sizes[game]; i++) // load game
+    memory[0x200 + i] = pgm_read_byte(games_pointers[game] + i);
+}
+
+void interface()
+{
+  for (u8 i = 0; i < GAMES_COUNT; i++)
+  {
+    tv.print(i + 1);
+    tv.print(". ");
+    tv.println(games_names[i]);
+  }
+  
+  while (1)
+  {    
+    key = keypad.getKey();
+
+    if (key >= 1 && key <= 10) {
+      tv.println("suka");
+      load_game(key - 1);
+      tv.clear_screen();
+      break;
     }
   }
 }
 
 void setup() {
   tv.begin(NTSC,128,96);
-  tv.select_font(font6x8);
-
-  for (u16 i = 0; i < 280; i++) // load game
-    memory[0x200 + i] = pgm_read_byte(BRIX + i);
+  tv.select_font(font8x8);
     
   for (u8 i = 0; i < 80; i++) // load fonts
     memory[i] = pgm_read_byte(fonts + i);
   
   randomSeed(analogRead(0));
+
+  tv.println(44, 32, "CHIP-8");
+  delay(3000);
+  tv.clear_screen();
+  tv.select_font(font6x8);
+  
+  interface();
 }
 
-void loop() {
+void loop() {  
   cycle();
 }
