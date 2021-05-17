@@ -59,7 +59,21 @@ void clear_keyboard()
   }
 }
 
-void disp()
+void display_sprite(u8 x, u8 y, u8 n)
+{
+  for (u8 i = y; i < (y + n); i++)
+  {
+    for (u8 j = x; j < (x + 8); j++)
+    {
+      if (j >= 0 && j < 64 && i >= 0 && i < 32)
+      {
+        tv.draw_rect(j * 2, i * 2 + 16, 1, 1, buf[i * 64 + j]);
+      }
+    }
+  }
+}
+
+void fill_screen()
 {
   for (u8 i = 0; i < 32; i++)
   {
@@ -85,6 +99,8 @@ void execute()
           {
               buf[i] = BLACK;
           }
+          fill_screen();
+          delay(5);
         break;
         case 0x0ee:
           pc = stack[--stack_p];
@@ -207,7 +223,8 @@ void execute()
           sprite_data <<= 1;
         }
       }
-      disp();
+      display_sprite(registers[vx], registers[vy], sprite_lines);
+      delay(5);
     break;
     case 0xe000:
       switch (kk)
@@ -321,17 +338,16 @@ void cycle()
 }
 
 void setup() {
-  tv.begin(NTSC,120,96);
+  tv.begin(NTSC,128,96);
   tv.select_font(font6x8);
 
-  for (u16 i = 0; i < 224; i++) // load game
-    memory[0x200 + i] = pgm_read_byte(UFO + i);
+  for (u16 i = 0; i < 280; i++) // load game
+    memory[0x200 + i] = pgm_read_byte(BRIX + i);
     
   for (u8 i = 0; i < 80; i++) // load fonts
     memory[i] = pgm_read_byte(fonts + i);
   
   randomSeed(analogRead(0));
-  Serial.begin(9600);
 }
 
 void loop() {
